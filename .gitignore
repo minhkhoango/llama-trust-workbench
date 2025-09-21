@@ -1,0 +1,23 @@
+# .gitignore
+# Python
+pycache/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-selfcheck.json
+
+# Poetry
+.poetry
+
+# Environment variables
+.env
+
+# Data artifacts
+/data/
+
+# Streamlit
+.streamlit/

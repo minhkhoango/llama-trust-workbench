@@ -1,0 +1,24 @@
+# pyproject.toml
+[tool.poetry]
+name = "llama-trust-workbench"
+version = "0.1.0"
+description = "An interactive diagnostic workbench for LlamaParse to visually trace and root-cause parsing errors in complex enterprise documents."
+authors = ["Khoa Ngo ngominhkhoa2006@gmail.com"]
+license = "MIT"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.10"
+streamlit = "^1.35.0"
+llama-parse = "^0.4.2"
+pymupdf = "^1.24.1"
+requests = "^2.31.0"
+python-dotenv = "^1.0.1"
+thefuzz = "^0.22.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
