@@ -33,6 +33,10 @@ async def test_pipeline_for_file(pdf_name: str) -> None:
 
     # --- STAGE 1: PARSING ---
     print("\n[STAGE 1/3] Calling LlamaParse API...")
+    print(f"   - Target: {pdf_path.name}")
+    print("   - NOTE: This is the slow part, especially for large documents.")
+    print("   - The script is waiting for their server to finish processing. Let it run.")
+    
     markdown_content = await parse_document(pdf_path)
     
     if markdown_content.strip().startswith("# Error"):
@@ -77,7 +81,7 @@ async def main() -> None:
     
     print("\nFinal Test Results:")
     for test_name, result in test_results.items():
-        status_icon = "❌" if result == "FAIL" else "✅" if result == "PASS" else "⏳"
+        status_icon = "❌" if result.startswith("FAIL") else "✅" if result == "PASS" else "⏳"
         print(f"  {status_icon} {test_name}: {result}")
     print("\n" + "="*80)
 
