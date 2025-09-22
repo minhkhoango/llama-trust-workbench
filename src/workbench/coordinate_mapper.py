@@ -5,6 +5,7 @@ from typing import List, Optional, Dict, Any, cast
 from thefuzz import fuzz  # type: ignore[import-untyped]
 
 from src.workbench.types import Block, MappedElement, Bbox
+from src.workbench.parser_service import PAGE_SEPARATOR
 
 
 def get_pdf_text_blocks(pdf_path: Path) -> List[List[Block]]:
@@ -80,48 +81,41 @@ def map_text_to_coordinates(
     all_pages_blocks = get_pdf_text_blocks(pdf_path)
     mapped_elements: List[MappedElement] = []
 
-    # Split markdown into paragraphs. A simple split on double newlines works well.
-    markdown_chunks = [
-        chunk for chunk in markdown_content.split("\n\n") if chunk.strip()
-    ]
+    # Split the markdown content into a list of pages.
+    markdown_pages = markdown_content.split(PAGE_SEPARATOR)
 
-    # Heuristic to guess the current page number.
-    # We assume the document is processed sequentially.
-    current_page_index = 0
+    element_counter = 0
 
-    for i, chunk in enumerate(markdown_chunks):
-        # The search space for a chunk is the current page and the next one.
-        # This helps handle cases where a text block crosses a page boundary.
-        search_pages_indices = {current_page_index}
-        if current_page_index + 1 < len(all_pages_blocks):
-            search_pages_indices.add(current_page_index + 1)
+    # Iterate through each page's markdown content with its page number.
+    for page_index, page_markdown in enumerate(markdown_pages):
 
-        search_blocks = [
-            block for idx in search_pages_indices for block in all_pages_blocks[idx]
+        if page_index >= len(all_pages_blocks):
+            # If markdown has more pages than PDF, stop.
+            continue
+
+        # Get the text blocks for the current page ONLY. This is the key.
+        current_page_blocks = all_pages_blocks[page_index]
+
+        # Split the current page's markdown into logical chunks (paragraphs).
+        markdown_chunks_for_page = [
+            chunk for chunk in page_markdown.split("\n\n") if chunk.strip()
         ]
 
-        match = find_best_match(chunk, search_blocks)
+        for chunk in markdown_chunks_for_page:
+            # Search for this chunk only within the current page's blocks.
+            match = find_best_match(chunk, current_page_blocks)
 
-        # Initialize with defaults
-        bbox: Optional[Bbox] = None
-        page_num = current_page_index
+            bbox: Optional[Bbox] = None
+            if match:
+                bbox = match.get("bbox")
 
-        if match:
-            # If a good match is found, update our current page.
-            matched_page_num = match.get("page_num", current_page_index)
-            if matched_page_num > current_page_index:
-                current_page_index = matched_page_num
-
-            page_num = matched_page_num
-            bbox = match.get("bbox")
-
-        element: MappedElement = {
-            "id": f"elem_{i}",
-            "text": chunk,
-            "page_num": page_num,
-            "bbox": bbox,
-        }
-
-        mapped_elements.append(element)
+            element: MappedElement = {
+                "id": f"elem_{element_counter}",
+                "text": chunk,
+                "page_num": page_index,  # The page number is now deterministic.
+                "bbox": bbox,
+            }
+            mapped_elements.append(element)
+            element_counter += 1
 
     return mapped_elements

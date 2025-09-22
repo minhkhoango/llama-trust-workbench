@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 # --- CONFIGURATION ---
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / ".cache"
+PAGE_SEPARATOR = "\n\n---PAGE_BREAK---\n\n"
 CACHE_DIR.mkdir(exist_ok=True)
 
 
@@ -28,7 +29,7 @@ def get_parser() -> LlamaParse:
 # --- CORE FUNCTIONALITY ---
 async def parse_document(pdf_path: Path) -> str:
     """
-    Parses a single PDF document using LlamaParse.
+    Parses a single PDF document using LlamaParse, processing all pages.
     Implements file-based caching to avoid re-processing.
     """
     cache_path: Path = CACHE_DIR / f"{pdf_path.stem}.md"
@@ -41,11 +42,13 @@ async def parse_document(pdf_path: Path) -> str:
     parser = get_parser()
 
     try:
+        # LlamaParse's aload_data returns a list of Document objects, one per page.
         documents = await parser.aload_data(str(pdf_path))  # type: ignore
         if not documents:
             raise IOError("LlamaParse returned no documents.")
 
-        parsed_content: str = documents[0].get_content()
+        all_pages_content = [doc.text for doc in documents]
+        parsed_content = PAGE_SEPARATOR.join(all_pages_content)
 
         # Save to cache
         cache_path.write_text(parsed_content, encoding="utf-8")

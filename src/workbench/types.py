@@ -60,6 +60,7 @@ TestStatus = Literal[
     "FAIL - BAD MATH",
     "FAIL - CATASTROPHIC (No Data)",
     "FAIL - FILE NOT FOUND",
+    "FAIL - UNKNOWN DOCUMENT",
 ]
 
 

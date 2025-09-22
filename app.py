@@ -36,12 +36,18 @@ def render_pdf_page_with_highlight(
     """Renders a specific page of a PDF to an image and draws a highlight box."""
     doc = fitz.open(doc_path)
     page = doc.load_page(page_num)  # type: ignore
-    pix = page.get_pixmap(dpi=150)  # type: ignore
+
+    dpi = 150
+    pix = page.get_pixmap(dpi=dpi)  # type: ignore
     img = Image.open(io.BytesIO(pix.tobytes("png")))  # type: ignore
 
     if highlight_bbox:
         draw = ImageDraw.Draw(img)
-        zoom_matrix = page.get_pixmap(dpi=150).matrix  # type: ignore
+        # To properly scale the bounding box, we need to create a matrix that
+        # represents the same transformation as rendering with a specific DPI.
+        # The default PDF DPI is 72.
+        zoom_factor = dpi / 72.0
+        zoom_matrix = fitz.Matrix(zoom_factor, zoom_factor)
         rect = fitz.Rect(highlight_bbox)
         rect.transform(zoom_matrix)  # type: ignore
         draw.rectangle((rect.x0, rect.y0, rect.x1, rect.y1), outline="#FF0000", width=3)
@@ -92,10 +98,10 @@ def load_fixed_trace_data(json_path: Path) -> List[TraceEvent]:
 
 
 @st.cache_resource(show_spinner="Running test harness...")
-def get_test_results() -> Dict[str, TestResult]:
-    """Runs the test harness on all documents."""
+def get_test_results(pdf_filename: str) -> Dict[str, TestResult]:
+    """Runs the test harness on a single document."""
     cache_dir = PROJECT_ROOT / ".cache"
-    return run_test_harness(cache_dir)
+    return run_test_harness(pdf_filename, cache_dir)
 
 
 # --- UI Layout ---
@@ -112,26 +118,6 @@ if "selected_element_id" not in st.session_state:
     st.session_state.selected_element_id = None
 if "simulate_fix" not in st.session_state:
     st.session_state.simulate_fix = False
-
-# --- Test Harness Display ---
-st.subheader("Test Harness Results")
-
-test_results = get_test_results()
-
-cols = st.columns(len(ARTIFACTS))
-for idx, (doc_name, result) in enumerate(test_results.items()):
-    with cols[idx]:
-        with st.container(border=True):
-            st.markdown(f"**{doc_name}**")
-            # Display test result status
-            if result["status"] == "PASS":
-                st.success(f"✅ {result['status']}", icon="✅")
-            else:
-                st.error(f"❌ {result['status']}", icon="❌")
-
-            st.caption(result["reason"])
-
-st.divider()
 
 
 # --- Sidebar Controls ---
@@ -156,6 +142,37 @@ if not selected_doc_name:
 pdf_filename = ARTIFACTS[selected_doc_name]
 pdf_path = DATA_DIR / pdf_filename
 
+# --- Test Harness Display ---
+st.subheader("Test Harness Result")
+
+# Ensure the document is parsed so the cache is available for the test harness
+asyncio.run(parse_document(pdf_path))
+
+test_results = get_test_results(pdf_filename)
+
+# This maps the document name to the test name used in the test harness
+doc_to_test_map = {
+    "GH-420: PPFAS Factsheet (Aug 2024)": "GH-420 (Hallucination)",
+    "GH-304: Samsung Financials (Q4 2024)": "GH-304 (Bad Math/Omission)",
+}
+test_key = doc_to_test_map.get(selected_doc_name)
+
+if test_key and test_key in test_results:
+    result = test_results[test_key]
+    with st.container(border=True):
+        st.markdown(f"**{selected_doc_name}**")
+        if result["status"] == "PASS":
+            st.success(f"{result['status']}", icon="✅")
+        else:
+            st.error(f"{result['status']}", icon="❌")
+        st.caption(result["reason"])
+else:
+    st.warning("Could not find a test result for the selected document.")
+
+
+st.divider()
+
+
 # --- Fix Simulation Control ---
 samsung_doc_key = "GH-304: Samsung Financials (Q4 2024)"
 # Map document names to test result keys
@@ -165,7 +182,8 @@ doc_to_test_map = {
 }
 if (
     selected_doc_name == samsung_doc_key
-    and test_results[doc_to_test_map[selected_doc_name]]["status"] != "PASS"
+    and test_key in test_results
+    and test_results[test_key]["status"] != "PASS"
 ):
     st.sidebar.toggle(
         "Simulate Fix with Premium Mode",
@@ -254,10 +272,24 @@ with col2:
 
     page_events = events_by_page.get(page_num_to_view, [])
 
+    # Filter out PAGE-BREAK elements
+    page_events = [
+        event for event in page_events if "---PAGE_BREAK---" not in event["text"]
+    ]
+
     if not page_events:
         st.info(f"No parsed elements found on page {page_num_to_view + 1}.")
     else:
         st.write(f"Found **{len(page_events)}** parsed elements on this page.")
+
+        # Helper function to get display text (first 30 chars, no page breaks)
+        def get_display_text(text: str) -> str:
+            # Remove page breaks
+            clean_text = text.replace("\n\n---PAGE_BREAK---\n\n", " ")
+            # Get first 30 chars
+            if len(clean_text) <= 30:
+                return clean_text.strip()
+            return clean_text[:30].strip() + "..."
 
         # Sort elements by top-to-bottom, then left-to-right reading order
         def _get_sort_key(event: TraceEvent) -> tuple[float, float]:
@@ -266,21 +298,27 @@ with col2:
                 return (0.0, 0.0)
             return (bbox[1], bbox[0])
 
-        for event in sorted(page_events, key=_get_sort_key):
+        with st.container(height=700):
+            # Display simple clickable elements for all page events
+            for event in sorted(page_events, key=_get_sort_key):
+                display_text = get_display_text(event["text"])
 
-            source_color = {
-                "Heuristic Paragraph Extraction": "blue",
-                "Heuristic Table Detection": "orange",
-                "Multimodal LLM Call (Table)": "green",
-                "Unknown": "gray",
-            }.get(event["source"], "gray")
+                source_color = {
+                    "Heuristic Paragraph Extraction": "blue",
+                    "Heuristic Table Detection": "orange",
+                    "Multimodal LLM Call (Table)": "green",
+                    "Unknown": "gray",
+                }.get(event["source"], "gray")
 
-            with st.container(border=True):
-                st.markdown(f"**Source**: :{source_color}[{event['source']}]")
-
-                if st.button("Highlight on PDF", key=event["id"]):
+                # Simple clickable button showing first 30 characters
+                if st.button(
+                    f"{display_text}", key=event["id"], use_container_width=True
+                ):
                     st.session_state.selected_element_id = event["id"]
                     st.rerun()
 
-                with st.expander("View Parsed Text"):
-                    st.code(event["text"], language="markdown", line_numbers=True)
+                # Show full text in-place if this element is selected
+                if st.session_state.selected_element_id == event["id"]:
+                    with st.container(border=True):
+                        st.markdown(f"**Source**: :{source_color}[{event['source']}]")
+                        st.code(event["text"], language="markdown", line_numbers=True)

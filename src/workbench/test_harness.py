@@ -86,32 +86,45 @@ def check_gh_304(content: str) -> TestResult:
     }
 
 
-def run_test_harness(cache_dir: Path) -> Dict[str, TestResult]:
+def run_test_harness(doc_filename: str, cache_dir: Path) -> Dict[str, TestResult]:
     """
-    Runs all defined tests against the cached markdown files.
+    Runs a specific test against a cached markdown file.
     """
     results: Dict[str, TestResult] = {}
 
-    # Test for GH-420
-    gh_420_file = cache_dir / "ppfas_factsheet_august_2024.md"
-    if gh_420_file.exists():
-        content = gh_420_file.read_text()
-        results["GH-420 (Hallucination)"] = check_gh_420(content)
-    else:
-        results["GH-420 (Hallucination)"] = {
-            "status": "FAIL - FILE NOT FOUND",
-            "reason": f"Cache file not found: {gh_420_file}",
-        }
+    test_map = {
+        "ppfas_factsheet_august_2024.pdf": (
+            "GH-420 (Hallucination)",
+            "ppfas_factsheet_august_2024.md",
+            check_gh_420,
+        ),
+        "samsung_factsheet_q4_2024.pdf": (
+            "GH-304 (Bad Math/Omission)",
+            "samsung_factsheet_q4_2024.md",
+            check_gh_304,
+        ),
+    }
 
-    # Test for GH-304
-    gh_304_file = cache_dir / "samsung_factsheet_q4_2024.md"
-    if gh_304_file.exists():
-        content = gh_304_file.read_text()
-        results["GH-304 (Bad Math/Omission)"] = check_gh_304(content)
+    if doc_filename not in test_map:
+        test_name = (
+            "error"  # A key to store the error, though it won't be a standard test name
+        )
+        results[test_name] = {
+            "status": "FAIL - UNKNOWN DOCUMENT",
+            "reason": f"No test found for {doc_filename}",
+        }
+        return results
+
+    test_name, md_filename, check_func = test_map[doc_filename]
+
+    md_file = cache_dir / md_filename
+    if md_file.exists():
+        content = md_file.read_text()
+        results[test_name] = check_func(content)
     else:
-        results["GH-304 (Bad Math/Omission)"] = {
+        results[test_name] = {
             "status": "FAIL - FILE NOT FOUND",
-            "reason": f"Cache file not found: {gh_304_file}",
+            "reason": f"Cache file not found: {md_file}",
         }
 
     return results
