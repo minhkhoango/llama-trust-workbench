@@ -34,9 +34,7 @@ def get_pdf_text_blocks(pdf_path: Path) -> List[List[Block]]:
     return all_pages_blocks
 
 
-def find_best_match(
-    text_chunk: str, page_blocks: List[Block]
-) -> Optional[Block]:
+def find_best_match(text_chunk: str, page_blocks: List[Block]) -> Optional[Block]:
     """
     Finds the best matching PDF text block for a given text chunk using fuzzy string matching.
     """
@@ -107,7 +105,7 @@ def map_text_to_coordinates(
         # Initialize with defaults
         bbox: Optional[Bbox] = None
         page_num = current_page_index
-        
+
         if match:
             # If a good match is found, update our current page.
             matched_page_num = match.get("page_num", current_page_index)
@@ -121,7 +119,7 @@ def map_text_to_coordinates(
             "id": f"elem_{i}",
             "text": chunk,
             "page_num": page_num,
-            "bbox": bbox
+            "bbox": bbox,
         }
 
         mapped_elements.append(element)

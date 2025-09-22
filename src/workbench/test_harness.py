@@ -34,15 +34,24 @@ def check_gh_420(content: str) -> TestResult:
     """
     # 1. Catastrophic Failure Check: Is the output basically empty or missing key sections?
     if len(content) < 500:  # A valid parse of this doc is over 2000 chars
-        return {"status": "FAIL - CATASTROPHIC (No Data)", "reason": "Document content too short"}
+        return {
+            "status": "FAIL - CATASTROPHIC (No Data)",
+            "reason": "Document content too short",
+        }
     if REQUIRED_TEXT_GH420 not in content:
-        return {"status": "FAIL - CATASTROPHIC (No Data)", "reason": "Document content too short"}
+        return {
+            "status": "FAIL - CATASTROPHIC (No Data)",
+            "reason": "Document content too short",
+        }
 
     # 2. Hallucination Check: If the parse seems okay, check for the bad text.
     if HALLUCINATED_TEXT_GH420 in content:
         return {"status": "FAIL - HALLUCINATION", "reason": "Hallucinated text found"}
 
-    return {"status": "PASS", "reason": "Document parsed successfully without hallucinations"}
+    return {
+        "status": "PASS",
+        "reason": "Document parsed successfully without hallucinations",
+    }
 
 
 def check_gh_304(content: str) -> TestResult:
@@ -60,7 +69,10 @@ def check_gh_304(content: str) -> TestResult:
     if len(content) < 1000 or len(lines_found) < len(REQUIRED_LINES_GH304):
         # We couldn't even find the basic structure of the P&L statement,
         # or the parsed content is suspiciously small.
-        return {"status": "FAIL - CATASTROPHIC (No Data)", "reason": "Document content too short"}
+        return {
+            "status": "FAIL - CATASTROPHIC (No Data)",
+            "reason": "Document content too short",
+        }
 
     # 2. Bad Math Check (Placeholder for future):
     # If we get here, it means the data was present. This is where we would
@@ -68,7 +80,10 @@ def check_gh_304(content: str) -> TestResult:
     # data is present, the test passes this stage.
     # In a real scenario, this would be `return "FAIL - BAD MATH"` if sums were wrong.
 
-    return {"status": "PASS", "reason": "Document parsed successfully without hallucinations"}
+    return {
+        "status": "PASS",
+        "reason": "Document parsed successfully without hallucinations",
+    }
 
 
 def run_test_harness(cache_dir: Path) -> Dict[str, TestResult]:
@@ -83,7 +98,10 @@ def run_test_harness(cache_dir: Path) -> Dict[str, TestResult]:
         content = gh_420_file.read_text()
         results["GH-420 (Hallucination)"] = check_gh_420(content)
     else:
-        results["GH-420 (Hallucination)"] = {"status": "FAIL - FILE NOT FOUND", "reason": f"Cache file not found: {gh_420_file}"}
+        results["GH-420 (Hallucination)"] = {
+            "status": "FAIL - FILE NOT FOUND",
+            "reason": f"Cache file not found: {gh_420_file}",
+        }
 
     # Test for GH-304
     gh_304_file = cache_dir / "samsung_factsheet_q4_2024.md"
@@ -91,6 +109,9 @@ def run_test_harness(cache_dir: Path) -> Dict[str, TestResult]:
         content = gh_304_file.read_text()
         results["GH-304 (Bad Math/Omission)"] = check_gh_304(content)
     else:
-        results["GH-304 (Bad Math/Omission)"] = {"status": "FAIL - FILE NOT FOUND", "reason": f"Cache file not found: {gh_304_file}"}
+        results["GH-304 (Bad Math/Omission)"] = {
+            "status": "FAIL - FILE NOT FOUND",
+            "reason": f"Cache file not found: {gh_304_file}",
+        }
 
     return results
