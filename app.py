@@ -229,25 +229,24 @@ for event in all_trace_events:
 
 
 # --- Main Content Display ---
+doc = fitz.open(pdf_path)
+num_pages = len(doc)
+doc.close()
+
+page_num_to_view = (
+    st.number_input(
+        "Page",
+        min_value=1,
+        max_value=num_pages,
+        value=1,
+        on_change=lambda: st.session_state.pop("selected_element_id", None),
+    )
+    - 1
+)
 col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Document Viewer")
-
-    doc = fitz.open(pdf_path)
-    num_pages = len(doc)
-    doc.close()
-
-    page_num_to_view = (
-        st.number_input(
-            "Page",
-            min_value=1,
-            max_value=num_pages,
-            value=1,
-            on_change=lambda: st.session_state.pop("selected_element_id", None),
-        )
-        - 1
-    )
 
     highlight_bbox: Optional[Bbox] = None
     if st.session_state.selected_element_id:
@@ -265,10 +264,11 @@ with col1:
     pdf_image = render_pdf_page_with_highlight(
         pdf_path, page_num_to_view, highlight_bbox
     )
-    st.image(pdf_image, width="stretch")
+    with st.container(height=450):
+        st.image(pdf_image, width="stretch")
 
 with col2:
-    st.subheader("Parsing Trace (Simulated)")
+    st.subheader("Parsing Trace")
 
     page_events = events_by_page.get(page_num_to_view, [])
 
@@ -277,48 +277,49 @@ with col2:
         event for event in page_events if "---PAGE_BREAK---" not in event["text"]
     ]
 
-    if not page_events:
-        st.info(f"No parsed elements found on page {page_num_to_view + 1}.")
-    else:
-        st.write(f"Found **{len(page_events)}** parsed elements on this page.")
+    # Helper function to get display text (first 30 chars, no page breaks)
 
-        # Helper function to get display text (first 30 chars, no page breaks)
-        def get_display_text(text: str) -> str:
-            # Remove page breaks
-            clean_text = text.replace("\n\n---PAGE_BREAK---\n\n", " ")
-            # Get first 30 chars
-            if len(clean_text) <= 30:
-                return clean_text.strip()
-            return clean_text[:30].strip() + "..."
+    def get_display_text(text: str) -> str:
+        # Remove page breaks
+        clean_text = text.replace("\n\n---PAGE_BREAK---\n\n", " ")
+        # Get first 30 chars
+        if len(clean_text) <= 30:
+            return clean_text.strip()
+        return clean_text[:30].strip() + "..."
 
-        # Sort elements by top-to-bottom, then left-to-right reading order
-        def _get_sort_key(event: TraceEvent) -> tuple[float, float]:
-            bbox = event["bbox"]
-            if bbox is None:
-                return (0.0, 0.0)
-            return (bbox[1], bbox[0])
+    # Sort elements by top-to-bottom, then left-to-right reading order
+    def _get_sort_key(event: TraceEvent) -> tuple[float, float]:
+        bbox = event["bbox"]
+        if bbox is None:
+            return (0.0, 0.0)
+        return (bbox[1], bbox[0])
 
-        with st.container(height=700):
-            # Display simple clickable elements for all page events
-            for event in sorted(page_events, key=_get_sort_key):
-                display_text = get_display_text(event["text"])
+    with st.container(height=450):
+        if not page_events:
+            st.info(f"No parsed elements found on page {page_num_to_view + 1}.")
+        else:
+            st.write(f"Found **{len(page_events)}** parsed elements on this page.")
+            
+        # Display simple clickable elements for all page events
+        for event in sorted(page_events, key=_get_sort_key):
+            display_text = get_display_text(event["text"])
 
-                source_color = {
-                    "Heuristic Paragraph Extraction": "blue",
-                    "Heuristic Table Detection": "orange",
-                    "Multimodal LLM Call (Table)": "green",
-                    "Unknown": "gray",
-                }.get(event["source"], "gray")
+            source_color = {
+                "Heuristic Paragraph Extraction": "blue",
+                "Heuristic Table Detection": "orange",
+                "Multimodal LLM Call (Table)": "green",
+                "Unknown": "gray",
+            }.get(event["source"], "gray")
 
-                # Simple clickable button showing first 30 characters
-                if st.button(
-                    f"{display_text}", key=event["id"], use_container_width=True
-                ):
-                    st.session_state.selected_element_id = event["id"]
-                    st.rerun()
+            # Simple clickable button showing first 30 characters
+            if st.button(
+                f"{display_text}", key=event["id"], width="stretch"
+            ):
+                st.session_state.selected_element_id = event["id"]
+                st.rerun()
 
-                # Show full text in-place if this element is selected
-                if st.session_state.selected_element_id == event["id"]:
-                    with st.container(border=True):
-                        st.markdown(f"**Source**: :{source_color}[{event['source']}]")
-                        st.code(event["text"], language="markdown", line_numbers=True)
+            # Show full text in-place if this element is selected
+            if st.session_state.selected_element_id == event["id"]:
+                with st.container(border=True):
+                    st.markdown(f"**Source**: :{source_color}[{event['source']}]")
+                    st.code(event["text"], language="markdown", line_numbers=True)
