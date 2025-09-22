@@ -1,6 +1,7 @@
 # .gitignore
 # Python
 pycache/
+__pycache__
 *.pyc
 *.pyo
 *.pyd
@@ -18,9 +19,6 @@ pip-selfcheck.json
 
 # Data artifacts
 /data/
-
-# Streamlit
-.streamlit/
 
 # Ruff
 .ruff_cache/

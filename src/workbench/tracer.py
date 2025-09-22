@@ -31,6 +31,7 @@ def simulate_trace(mapped_data: List[MappedElement]) -> List[TraceEvent]:
             "page_num": element["page_num"],
             "bbox": element["bbox"],
             "source": source,
+            "error": None
         }
 
         trace_events.append(event)

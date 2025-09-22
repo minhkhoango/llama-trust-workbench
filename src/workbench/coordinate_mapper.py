@@ -4,16 +4,16 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, cast
 from thefuzz import fuzz  # type: ignore[import-untyped]
 
-from src.workbench.types import PdfTextBlock, MappedElement, BoundingBox
+from src.workbench.types import Block, MappedElement, Bbox
 
 
-def get_pdf_text_blocks(pdf_path: Path) -> List[List[PdfTextBlock]]:
+def get_pdf_text_blocks(pdf_path: Path) -> List[List[Block]]:
     """
     Extracts all text blocks with coordinate data from each page of a PDF.
     Returns a list of lists, where each inner list corresponds to a page.
     """
     doc = fitz.open(pdf_path)
-    all_pages_blocks: List[List[PdfTextBlock]] = []
+    all_pages_blocks: List[List[Block]] = []
     for page_num in range(len(doc)):
         page = doc[page_num]
         # Using 'dict' gives us detailed info including bounding boxes
@@ -21,10 +21,10 @@ def get_pdf_text_blocks(pdf_path: Path) -> List[List[PdfTextBlock]]:
         page_blocks_raw: List[Dict[str, Any]] = page_dict.get("blocks", [])
 
         # Convert to properly typed blocks and add page number
-        page_blocks: List[PdfTextBlock] = []
+        page_blocks: List[Block] = []
         for block_raw in page_blocks_raw:
             if "lines" in block_raw:  # Only process text blocks
-                block: PdfTextBlock = cast(PdfTextBlock, block_raw)
+                block: Block = cast(Block, block_raw)
                 block["page_num"] = page_num
                 page_blocks.append(block)
 
@@ -35,13 +35,13 @@ def get_pdf_text_blocks(pdf_path: Path) -> List[List[PdfTextBlock]]:
 
 
 def find_best_match(
-    text_chunk: str, page_blocks: List[PdfTextBlock]
-) -> Optional[PdfTextBlock]:
+    text_chunk: str, page_blocks: List[Block]
+) -> Optional[Block]:
     """
     Finds the best matching PDF text block for a given text chunk using fuzzy string matching.
     """
     best_score = 0
-    best_block: Optional[PdfTextBlock] = None
+    best_block: Optional[Block] = None
 
     # Clean the input chunk for better matching
     clean_chunk = " ".join(text_chunk.strip().split())
@@ -104,23 +104,25 @@ def map_text_to_coordinates(
 
         match = find_best_match(chunk, search_blocks)
 
+        # Initialize with defaults
+        bbox: Optional[Bbox] = None
+        page_num = current_page_index
+        
+        if match:
+            # If a good match is found, update our current page.
+            matched_page_num = match.get("page_num", current_page_index)
+            if matched_page_num > current_page_index:
+                current_page_index = matched_page_num
+
+            page_num = matched_page_num
+            bbox = match.get("bbox")
+
         element: MappedElement = {
             "id": f"elem_{i}",
             "text": chunk,
-            "page_num": current_page_index,  # Default to current page
-            "bbox": None,  # Default to no bounding box
+            "page_num": page_num,
+            "bbox": bbox
         }
-
-        if match:
-            # If a good match is found, update our current page.
-            page_num = match.get("page_num", current_page_index)
-            if page_num > current_page_index:
-                current_page_index = page_num
-
-            bbox: Optional[BoundingBox] = match.get("bbox")
-
-            element["page_num"] = page_num
-            element["bbox"] = bbox
 
         mapped_elements.append(element)
 

@@ -1,47 +1,61 @@
 # src/workbench/types.py
-from typing import TypedDict, List, Tuple, Optional
+from typing import TypedDict, List, Tuple, Optional, Literal
 
 # A bounding box is a tuple of four floats (x0, y0, x1, y1)
-BoundingBox = Tuple[float, float, float, float]
-Bbox = BoundingBox  # Shorter alias for convenience
+Bbox = Tuple[float, float, float, float] | None
+
 # --- PyMuPDF Raw Data Structures ---
 
-
 # Structure of a "span" from PyMuPDF's get_text("dict")
-class PdfSpan(TypedDict):
+class Span(TypedDict):
+    size: float
+    flags: int
+    font: str
+    color: int
+    ascender: float
+    descender: float
     text: str
-    # other keys like font, size, etc., exist but are not needed for this app
+    origin: Tuple[float, float]
+    bbox: Bbox
 
+# Structure of a "line" from PyMuPDF's get_text("dict")
+class Line(TypedDict):
+    wmode: int
+    dir: Tuple[float, float]
+    bbox: Bbox
+    spans: List[Span]
 
-# Structure of a "line" from PyMuPDF
-class PdfLine(TypedDict):
-    spans: List[PdfSpan]
-    bbox: BoundingBox
-    # other keys exist
-
-
-# Structure of a "block" from PyMuPDF. This is our core PdfTextBlock
-class PdfTextBlock(TypedDict):
-    number: int
-    type: int
-    bbox: BoundingBox
-    lines: List[PdfLine]
-    # This is a custom key we add for our own tracking
+# Structure of a "block" from PyMuPDF's get_text("dict")
+class Block(TypedDict):
     page_num: int
-
+    type: int
+    bbox: Bbox
+    lines: List[Line]
 
 # --- Workbench Data Structures ---
 
-
-# An element after being mapped from markdown to its PDF coordinates
+# An element after being mapped from markdown to PDF coordinates
 class MappedElement(TypedDict):
     id: str
     text: str
     page_num: int
-    # Bbox can be None if no suitable coordinate match is found for a text chunk
-    bbox: Optional[BoundingBox]
+    bbox: Bbox
 
-
-# A trace event, which is a MappedElement augmented with a simulated source
+# A simulated trace event, representing one step in the parsing pipeline
 class TraceEvent(MappedElement):
     source: str
+    error: Optional[str] # Field for potential error messages
+
+# Define the exact, allowed statuses for a test result. No others are valid.
+TestStatus = Literal[
+    "PASS",
+    "FAIL - HALLUCINATION",
+    "FAIL - BAD MATH",
+    "FAIL - CATASTROPHIC (No Data)",
+    "FAIL - FILE NOT FOUND"
+]
+
+# The final result structure from the test harness for a single document
+class TestResult(TypedDict):
+    status: TestStatus
+    reason: str
