@@ -16,11 +16,12 @@ pymupdf = "^1.24.1"
 requests = "^2.31.0"
 python-dotenv = "^1.0.1"
 thefuzz = "^0.22.1"
+pillow = "^11.3.0"
 
 
 [tool.poetry.group.dev.dependencies]
 pymupdf-stubs = "^1.26.1.post1"
-ruff = "^0.13.1"
+black = "^25.9.0"
 
 [build-system]
 requires = ["poetry-core"]

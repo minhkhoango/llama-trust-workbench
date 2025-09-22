@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / ".cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
+
 # --- SERVICE INITIALIZATION ---
 def get_parser() -> LlamaParse:
     """
@@ -22,6 +23,7 @@ def get_parser() -> LlamaParse:
             "Please create a .env file and add your API key."
         )
     return LlamaParse(api_key=api_key, result_type="markdown", verbose=True)  # type: ignore
+
 
 # --- CORE FUNCTIONALITY ---
 async def parse_document(pdf_path: Path) -> str:
@@ -42,7 +44,7 @@ async def parse_document(pdf_path: Path) -> str:
         documents = await parser.aload_data(str(pdf_path))  # type: ignore
         if not documents:
             raise IOError("LlamaParse returned no documents.")
-        
+
         parsed_content: str = documents[0].get_content()
 
         # Save to cache

@@ -13,37 +13,37 @@ DATA_DIR = Path(__file__).resolve().parent / "data"
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 
 # The specific files we want to process
-PDF_FILES = [
-    "ppfas_factsheet_august_2024.pdf",
-    "samsung_factsheet_q4_2024.pdf"
-]
+PDF_FILES = ["ppfas_factsheet_august_2024.pdf", "samsung_factsheet_q4_2024.pdf"]
+
 
 async def test_pipeline_for_file(pdf_name: str) -> None:
     """Runs the entire backend pipeline for a single file and prints the output."""
     pdf_path = DATA_DIR / pdf_name
-    
+
     if not pdf_path.exists():
         print(f"ERROR: PDF file not found at {pdf_path}")
         print("Please run 'poetry run python scripts/get_artifacts.py' first.")
         return
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print(f"🚀 STARTING PIPELINE FOR: {pdf_name}")
-    print("="*80)
+    print("=" * 80)
 
     # --- STAGE 1: PARSING ---
     print("\n[STAGE 1/3] Calling LlamaParse API...")
     print(f"   - Target: {pdf_path.name}")
     print("   - NOTE: This is the slow part, especially for large documents.")
-    print("   - The script is waiting for their server to finish processing. Let it run.")
-    
+    print(
+        "   - The script is waiting for their server to finish processing. Let it run."
+    )
+
     markdown_content = await parse_document(pdf_path)
-    
+
     if markdown_content.strip().startswith("# Error"):
         print("❌ PARSING FAILED.")
         print(markdown_content)
         return
-        
+
     print(f"✅ Parsing successful. Received {len(markdown_content)} characters.")
 
     # --- STAGE 2: COORDINATE MAPPING ---
@@ -70,20 +70,22 @@ async def main() -> None:
     # Run the full pipeline for each document to populate the cache
     for pdf_file in PDF_FILES:
         await test_pipeline_for_file(pdf_file)
-        
+
     # --- FINAL STAGE: TEST HARNESS ---
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("📊 RUNNING TEST HARNESS ON CACHED RESULTS")
-    print("="*80)
-    
+    print("=" * 80)
+
     # The test harness runs synchronously on the cached files
     test_results = run_tests(CACHE_DIR)
-    
+
     print("\nFinal Test Results:")
     for test_name, result in test_results.items():
-        status_icon = "❌" if result.startswith("FAIL") else "✅" if result == "PASS" else "⏳"
+        status_icon = (
+            "❌" if result.startswith("FAIL") else "✅" if result == "PASS" else "⏳"
+        )
         print(f"  {status_icon} {test_name}: {result}")
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
 
 
 if __name__ == "__main__":
