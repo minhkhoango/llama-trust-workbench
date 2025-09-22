@@ -21,3 +21,9 @@ pip-selfcheck.json
 
 # Streamlit
 .streamlit/
+
+# Ruff
+.ruff_cache/
+
+# Cache
+.cache/
